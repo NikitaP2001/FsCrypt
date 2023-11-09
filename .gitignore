@@ -1,0 +1,16 @@
+*.exe
+*.pdb
+*.log
+*.recipe
+*.obj
+*.log
+*.inf
+*.tlog
+*.cer
+*.sys
+*.cat
+*.spc
+*.pfx
+*.pvk
+.vscode
+.vs
