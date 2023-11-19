@@ -5,6 +5,8 @@ VisualStudioVersion = 16.0.33130.400
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Filter", "Filter\Filter.vcxproj", "{E803405A-893A-4EF8-A3AE-58CDD452DD0F}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CryptCli", "CryptCli\CryptCli.vcxproj", "{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -41,6 +43,18 @@ Global
 		{E803405A-893A-4EF8-A3AE-58CDD452DD0F}.Release|x86.ActiveCfg = Release|Win32
 		{E803405A-893A-4EF8-A3AE-58CDD452DD0F}.Release|x86.Build.0 = Release|Win32
 		{E803405A-893A-4EF8-A3AE-58CDD452DD0F}.Release|x86.Deploy.0 = Release|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|ARM.ActiveCfg = Debug|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|ARM64.ActiveCfg = Debug|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|x64.ActiveCfg = Debug|x64
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|x64.Build.0 = Debug|x64
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|x86.ActiveCfg = Debug|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Debug|x86.Build.0 = Debug|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|ARM.ActiveCfg = Release|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|ARM64.ActiveCfg = Release|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|x64.ActiveCfg = Release|x64
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|x64.Build.0 = Release|x64
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|x86.ActiveCfg = Release|Win32
+		{033809BC-F5A7-4ABA-BE0D-50CCF09D3273}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

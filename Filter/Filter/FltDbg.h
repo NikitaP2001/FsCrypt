@@ -12,6 +12,7 @@
 #define LOGFL_WRITE     0x00000004  // if set, display WRITE operation info
 #define LOGFL_DIRCTRL   0x00000008  // if set, display DIRCTRL operation info
 #define LOGFL_VOLCTX    0x00000010  // if set, display VOLCTX operation info
+#define LOGFL_TRACE     0x00000020
 
 extern ULONG LoggingFlags;
 

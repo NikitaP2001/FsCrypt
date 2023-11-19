@@ -12,5 +12,7 @@
 *.spc
 *.pfx
 *.pvk
+*.idb
+*.ilk
 .vscode
 .vs

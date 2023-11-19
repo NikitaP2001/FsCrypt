@@ -70,11 +70,8 @@ Return Value:
             //  We could not allocate a context, quit now            
             leave;
         }
-
-        //
+        
         //  Always get the volume properties, so I can get a sector size
-        //
-
         status = FltGetVolumeProperties(FltObjects->Volume,
             volProp,
             sizeof(volPropBuffer),
@@ -84,51 +81,33 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  Save the sector size in the context for later use.  Note that
         //  we will pick a minimum sector size if a sector size is not
         //  specified.
-        //
-
         FLT_ASSERT((volProp->SectorSize == 0) || (volProp->SectorSize >= MIN_SECTOR_SIZE));
 
         ctx->SectorSize = max(volProp->SectorSize, MIN_SECTOR_SIZE);
-
-        //
+        
         //  Init the buffer field (which may be allocated later).
-        //
-
         ctx->Name.Buffer = NULL;
-
-        //
+        
         //  Get the storage device object we want a name for.
-        //
-
         status = FltGetDiskDeviceObject(FltObjects->Volume, &devObj);
 
         if (NT_SUCCESS(status)) {
-
-            //
+            
             //  Try and get the DOS name.  If it succeeds we will have
             //  an allocated name buffer.  If not, it will be NULL
-            //
-
             status = IoVolumeDeviceToDosName(devObj, &ctx->Name);
         }
-
-        //
+        
         //  If we could not get a DOS name, get the NT name.
-        //
-
         if (!NT_SUCCESS(status)) {
 
             FLT_ASSERT(ctx->Name.Buffer == NULL);
-
-            //
+            
             //  Figure out which name to use from the properties
-            //
-
             if (volProp->RealDeviceName.Length > 0) {
 
                 workingName = &volProp->RealDeviceName;
@@ -140,26 +119,17 @@ Return Value:
 
             }
             else {
-
-                //
+                
                 //  No name, don't save the context
-                //
-
                 status = STATUS_FLT_DO_NOT_ATTACH;
                 leave;
             }
-
-            //
+            
             //  Get size of buffer to allocate.  This is the length of the
             //  string plus room for a trailing colon.
-            //
-
             size = workingName->Length + sizeof(WCHAR);
-
-            //
+            
             //  Now allocate a buffer to hold this name
-            //
-
 #pragma prefast(suppress:__WARNING_MEMORY_LEAK, "ctx->Name.Buffer will not be leaked because it is freed in CleanupVolumeContext")
             ctx->Name.Buffer = ExAllocatePoolZero(NonPagedPool,
                 size,
@@ -169,52 +139,34 @@ Return Value:
                 status = STATUS_INSUFFICIENT_RESOURCES;
                 leave;
             }
-
-            //
+            
             //  Init the rest of the fields
-            //
-
             ctx->Name.Length = 0;
             ctx->Name.MaximumLength = size;
-
-            //
+            
             //  Copy the name in
-            //
-
             RtlCopyUnicodeString(&ctx->Name,
                 workingName);
-
-            //
+            
             //  Put a trailing colon to make the display look good
-            //
-
             RtlAppendUnicodeToString(&ctx->Name,
                 L":");
         }
-
-        //
+        
         //  Set the context
-        //
-
         status = FltSetVolumeContext(FltObjects->Volume,
             FLT_SET_CONTEXT_KEEP_IF_EXISTS,
             ctx,
             NULL);
-
-        //
+        
         //  Log debug info
-        //
-
         LOG_PRINT(LOGFL_VOLCTX,
             ("SwapBuffers!InstanceSetup:                  Real SectSize=0x%04x, Used SectSize=0x%04x, Name=\"%wZ\"\n",
                 volProp->SectorSize,
                 ctx->SectorSize,
                 &ctx->Name));
-
-        //
+        
         //  It is OK for the context to already be defined.
-        //
-
         if (status == STATUS_FLT_CONTEXT_ALREADY_DEFINED) {
 
             status = STATUS_SUCCESS;
@@ -255,22 +207,12 @@ CleanupVolumeContext(
     _In_ PFLT_CONTEXT Context,
     _In_ FLT_CONTEXT_TYPE ContextType
 )
-/*++
-
-Routine Description:
-
+/*
     The given context is being freed.
     Free the allocated name buffer if there one.
 
-Arguments:
-
     Context - The context being freed
-
     ContextType - The type of context this is
-
-Return Value:
-
-    None
 
 --*/
 {
@@ -295,23 +237,15 @@ InstanceQueryTeardown(
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
     _In_ FLT_INSTANCE_QUERY_TEARDOWN_FLAGS Flags
 )
-/*++
-
-Routine Description:
-
+/*
     This is called when an instance is being manually deleted by a
     call to FltDetachVolume or FilterDetach.  We always return it is OK to
     detach.
-
-Arguments:
-
     FltObjects - Pointer to the FLT_RELATED_OBJECTS data structure containing
         opaque handles to this filter, instance and its associated volume.
 
     Flags - Indicating where this detach request came from.
-
 Return Value:
-
     Always succeed.
 
 --*/
@@ -323,11 +257,6 @@ Return Value:
 
     return STATUS_SUCCESS;
 }
-
-
-/*************************************************************************
-    MiniFilter callback routines.
-*************************************************************************/
 
 FLT_PREOP_CALLBACK_STATUS
 SwapPreReadBuffers(
@@ -344,7 +273,7 @@ SwapPreReadBuffers(
         file object.
     CompletionContext - Receives the context that will be passed to the
         post-operation callback.
-Return Value:
+    Return Value:
     FLT_PREOP_SUCCESS_WITH_CALLBACK - we want a postOpeation callback
     FLT_PREOP_SUCCESS_NO_CALLBACK - we don't want a postOperation callback
 */
@@ -366,7 +295,18 @@ Return Value:
 
             leave;
         }
-       
+
+        LOG_PRINT(LOGFL_TRACE, ("Reading file: %wZ\n",
+            FltObjects->FileObject->FileName));
+        PFILE_OBJECT pFile = FltObjects->FileObject;
+        if (CryptStorageIsFilePresent(&gCryptStorage, pFile) 
+            && CryptStorageIsAuthenticated(&gCryptStorage)) {
+            LOG_PRINT(LOGFL_TRACE, ("Reading file: %wZ\n",
+                FltObjects->FileObject->FileName));
+        } else {            
+            leave;
+        }
+
         //  Get our volume context so we can display our volume name in the
         //  debug output.
         status = FltGetVolumeContext(FltObjects->Filter,
@@ -451,8 +391,7 @@ Return Value:
         
         //  Log that we are swapping
         LOG_PRINT(LOGFL_READ,
-            ("SwapBuffers!SwapPreReadBuffers:             %wZ newB=%p newMdl=%p oldB=%p oldMdl=%p len=%d\n",
-                &volCtx->Name,
+            ("SwapBuffers!SwapPreReadBuffers: newB=%p newMdl=%p oldB=%p oldMdl=%p len=%d\n",                
                 newBuf,
                 newMdl,
                 iopb->Parameters.Read.ReadBuffer,
@@ -481,19 +420,16 @@ Return Value:
         if (retValue != FLT_PREOP_SUCCESS_WITH_CALLBACK) {
 
             if (newBuf != NULL) {
-
                 FltFreePoolAlignedWithTag(FltObjects->Instance,
                     newBuf,
                     BUFFER_SWAP_TAG);
             }
 
             if (newMdl != NULL) {
-
                 IoFreeMdl(newMdl);
             }
 
             if (volCtx != NULL) {
-
                 FltReleaseContext(volCtx);
             }
         }
@@ -531,7 +467,6 @@ Return Value:
     
     //  This system won't draining an operation with swapped buffers, verify
     //  the draining flag is not set.
-
     FLT_ASSERT(!FlagOn(Flags, FLTFL_POST_OPERATION_DRAINING));
 
     try {
@@ -550,6 +485,11 @@ Return Value:
 
             leave;
         }
+
+        CryptXorBuffer(&gCryptStorage,
+            (ULONG)Data->IoStatus.Information,
+            iopb->Parameters.Read.ByteOffset.QuadPart,
+            p2pCtx->SwappedBuffer);
         
         //  We need to copy the read data back into the users buffer.  Note
         //  that the parameters passed in are for the users original buffers
@@ -581,8 +521,7 @@ Return Value:
                 leave;
             }
 
-        }
-        else if (FlagOn(Data->Flags, FLTFL_CALLBACK_DATA_SYSTEM_BUFFER) ||
+        } else if (FlagOn(Data->Flags, FLTFL_CALLBACK_DATA_SYSTEM_BUFFER) ||
             FlagOn(Data->Flags, FLTFL_CALLBACK_DATA_FAST_IO_OPERATION)) {
             
             //  If this is a system buffer, just use the given address because
@@ -661,8 +600,7 @@ Return Value:
         //  handled by FltMgr.        
         if (cleanupAllocatedBuffer) {
 
-            LOG_PRINT(LOGFL_READ, ("%wZ newB=%p info=%Iu Freeing\n",
-                    &p2pCtx->VolCtx->Name,
+            LOG_PRINT(LOGFL_READ, ("SwapBuffers!SwapPostReadBuffers newB=%p info=%Iu Freeing\n",                    
                     p2pCtx->SwappedBuffer,
                     Data->IoStatus.Information));
 
@@ -714,12 +652,9 @@ SwapPostReadBuffersWhenSafe(
     UNREFERENCED_PARAMETER(FltObjects);
     UNREFERENCED_PARAMETER(Flags);
     FLT_ASSERT(Data->IoStatus.Information != 0);
-
-    //
+    
     //  This is some sort of user buffer without a MDL, lock the user buffer
     //  so we can access it.  This will create a MDL for it.
-    //
-
     status = FltLockUserBuffer(Data);
 
     if (!NT_SUCCESS(status)) {
@@ -729,21 +664,15 @@ SwapPostReadBuffersWhenSafe(
                 &p2pCtx->VolCtx->Name,
                 iopb->Parameters.Read.ReadBuffer,
                 status));
-
-        //
+        
         //  If we can't lock the buffer, fail the operation
-        //
-
         Data->IoStatus.Status = status;
         Data->IoStatus.Information = 0;
 
     }
     else {
-
-        //
+        
         //  Get a system address for this buffer.
-        //
-
         origBuf = MmGetSystemAddressForMdlSafe(iopb->Parameters.Read.MdlAddress,
             NormalPagePriority | MdlMappingNoExecute);
 
@@ -753,11 +682,8 @@ SwapPostReadBuffersWhenSafe(
                 ("SwapBuffers!SwapPostReadBuffersWhenSafe:    %wZ Failed to get system address for MDL: %p\n",
                     &p2pCtx->VolCtx->Name,
                     iopb->Parameters.Read.MdlAddress));
-
-            //
+            
             //  If we couldn't get a SYSTEM buffer address, fail the operation
-            //
-
             Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
             Data->IoStatus.Information = 0;
 
@@ -773,10 +699,7 @@ SwapPostReadBuffersWhenSafe(
         }
     }
 
-    //
     //  Free allocated memory and release the volume context
-    //
-
     LOG_PRINT(LOGFL_READ,
         ("SwapBuffers!SwapPostReadBuffersWhenSafe:    %wZ newB=%p info=%Iu Freeing\n",
             &p2pCtx->VolCtx->Name,
@@ -869,13 +792,10 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  Allocate nonPaged memory for the buffer we are swapping to.
         //  If we fail to get the memory, just don't swap buffers on this
         //  operation.
-        //
-
         newBuf = ExAllocatePoolZero(NonPagedPool,
             iopb->Parameters.DirectoryControl.QueryDirectory.Length,
             BUFFER_SWAP_TAG);
@@ -889,17 +809,11 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  We need to build a MDL because Directory Control Operations are always IRP operations.
-        //
-
-
-        //
+        
         //  Allocate a MDL for the new allocated memory.  If we fail
         //  the MDL allocation then we won't swap buffer for this operation
-        //
-
         newMdl = IoAllocateMdl(newBuf,
             iopb->Parameters.DirectoryControl.QueryDirectory.Length,
             FALSE,
@@ -914,19 +828,13 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  setup the MDL for the non-paged pool we just allocated
-        //
-
         MmBuildMdlForNonPagedPool(newMdl);
-
-        //
+        
         //  We are ready to swap buffers, get a pre2Post context structure.
         //  We need it to pass the volume context and the allocate memory
         //  buffer to the post operation callback.
-        //
-
         p2pCtx = ExAllocateFromNPagedLookasideList(&Pre2PostContextList);
 
         if (p2pCtx == NULL) {
@@ -937,11 +845,8 @@ Return Value:
 
             leave;
         }
-
-        //
-        //  Log that we are swapping
-        //
-
+        
+        //  Log that we are swapping        
         LOG_PRINT(LOGFL_DIRCTRL,
             ("SwapBuffers!SwapPreDirCtrlBuffers:          %wZ newB=%p newMdl=%p oldB=%p oldMdl=%p len=%d\n",
                 &volCtx->Name,
@@ -950,28 +855,19 @@ Return Value:
                 iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer,
                 iopb->Parameters.DirectoryControl.QueryDirectory.MdlAddress,
                 iopb->Parameters.DirectoryControl.QueryDirectory.Length));
-
-        //
+        
         //  Update the buffer pointers and MDL address
-        //
-
         iopb->Parameters.DirectoryControl.QueryDirectory.DirectoryBuffer = newBuf;
         iopb->Parameters.DirectoryControl.QueryDirectory.MdlAddress = newMdl;
         FltSetCallbackDataDirty(Data);
-
-        //
+        
         //  Pass state to our post-operation callback.
-        //
-
         p2pCtx->SwappedBuffer = newBuf;
         p2pCtx->VolCtx = volCtx;
 
         *CompletionContext = p2pCtx;
-
-        //
+        
         //  Return we want a post-operation callback
-        //
-
         retValue = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 
     }
@@ -1121,40 +1017,31 @@ Return Value:
         }
         else {
 
-            //
             //  They don't have a MDL and this is not a system buffer
             //  or a fastio so this is probably some arbitrary user
             //  buffer.  We can not do the processing at DPC level so
             //  try and get to a safe IRQL so we can do the processing.
-            //
-
             if (FltDoCompletionProcessingWhenSafe(Data,
                 FltObjects,
                 CompletionContext,
                 Flags,
                 SwapPostDirCtrlBuffersWhenSafe,
                 &retValue)) {
-
-                //
+                
                 //  This operation has been moved to a safe IRQL, the called
                 //  routine will do (or has done) the freeing so don't do it
                 //  in our routine.
-                //
-
                 cleanupAllocatedBuffer = FALSE;
 
             }
             else {
-
-                //
+                
                 //  We are in a state where we can not get to a safe IRQL and
                 //  we do not have a MDL.  There is nothing we can do to safely
                 //  copy the data back to the users buffer, fail the operation
                 //  and return.  This shouldn't ever happen because in those
                 //  situations where it is not safe to post, we should have
                 //  a MDL.
-                //
-
                 LOG_PRINT(LOGFL_ERRORS,
                     ("SwapBuffers!SwapPostDirCtrlBuffers:         %wZ Unable to post to a safe IRQL\n",
                         &p2pCtx->VolCtx->Name));
@@ -1318,26 +1205,20 @@ Return Value:
 
         }
         else {
-
-            //
+            
             //  Copy the data back to the original buffer
             //
             //  NOTE:  Due to a bug in FASTFAT where it is returning the wrong
             //         length in the information field (it is short) we are
             //         always going to copy the original buffer length.
-            //
-
             RtlCopyMemory(origBuf,
                 p2pCtx->SwappedBuffer,
                 /*Data->IoStatus.Information*/
                 iopb->Parameters.DirectoryControl.QueryDirectory.Length);
         }
     }
-
-    //
+    
     //  Free the memory we allocated and return
-    //
-
     LOG_PRINT(LOGFL_DIRCTRL,
         ("SwapBuffers!SwapPostDirCtrlBuffersWhenSafe: %wZ newB=%p info=%Iu Freeing\n",
             &p2pCtx->VolCtx->Name,
@@ -1360,31 +1241,22 @@ SwapPreWriteBuffers(
     _In_ PCFLT_RELATED_OBJECTS FltObjects,
     _Flt_CompletionContext_Outptr_ PVOID* CompletionContext
 )
-/*++
-
-Routine Description:
-
+/*
     This routine demonstrates how to swap buffers for the WRITE operation.
-
     Note that it handles all errors by simply not doing the buffer swap.
 
-Arguments:
-
     Data - Pointer to the filter callbackData that is passed to us.
-
     FltObjects - Pointer to the FLT_RELATED_OBJECTS data structure containing
         opaque handles to this filter, instance, its associated volume and
         file object.
-
     CompletionContext - Receives the context that will be passed to the
         post-operation callback.
-
 Return Value:
 
     FLT_PREOP_SUCCESS_WITH_CALLBACK - we want a postOpeation callback
     FLT_PREOP_SUCCESS_NO_CALLBACK - we don't want a postOperation callback
     FLT_PREOP_COMPLETE -
---*/
+*/
 {
     PFLT_IO_PARAMETER_BLOCK iopb = Data->Iopb;
     FLT_PREOP_CALLBACK_STATUS retValue = FLT_PREOP_SUCCESS_NO_CALLBACK;
@@ -1397,22 +1269,26 @@ Return Value:
     ULONG writeLen = iopb->Parameters.Write.Length;
 
     try {
-
-        //
+        
         //  If they are trying to write ZERO bytes, then don't do anything and
         //  we don't need a post-operation callback.
-        //
-
         if (writeLen == 0) {
 
             leave;
         }
 
-        //
+
+        PFILE_OBJECT pFile = FltObjects->FileObject;
+        if (CryptStorageIsFilePresent(&gCryptStorage, pFile) 
+            && CryptStorageIsAuthenticated(&gCryptStorage)) {
+            LOG_PRINT(LOGFL_TRACE, ("Writing file: %wZ\n",
+                FltObjects->FileObject->FileName));
+        } else {
+            leave;
+        }
+        
         //  Get our volume context so we can display our volume name in the
         //  debug output.
-        //
-
         status = FltGetVolumeContext(FltObjects->Filter,
             FltObjects->Volume,
             &volCtx);
@@ -1425,26 +1301,20 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  If this is a non-cached I/O we need to round the length up to the
         //  sector size for this device.  We must do this because the file
         //  systems do this and we need to make sure our buffer is as big
         //  as they are expecting.
-        //
-
         if (FlagOn(IRP_NOCACHE, iopb->IrpFlags)) {
 
             writeLen = (ULONG)ROUND_TO_SIZE(writeLen, volCtx->SectorSize);
         }
-
-        //
+        
         //  Allocate aligned nonPaged memory for the buffer we are swapping
         //  to. This is really only necessary for noncached IO but we always
         //  do it here for simplification. If we fail to get the memory, just
         //  don't swap buffers on this operation.
-        //
-
         newBuf = FltAllocatePoolAlignedWithTag(FltObjects->Instance,
             NonPagedPool,
             (SIZE_T)writeLen,
@@ -1459,21 +1329,15 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  We only need to build a MDL for IRP operations.  We don't need to
         //  do this for a FASTIO operation because it is a waste of time since
         //  the FASTIO interface has no parameter for passing the MDL to the
         //  file system.
-        //
-
         if (FlagOn(Data->Flags, FLTFL_CALLBACK_DATA_IRP_OPERATION)) {
-
-            //
+            
             //  Allocate a MDL for the new allocated memory.  If we fail
             //  the MDL allocation then we won't swap buffer for this operation
-            //
-
             newMdl = IoAllocateMdl(newBuf,
                 writeLen,
                 FALSE,
@@ -1488,25 +1352,16 @@ Return Value:
 
                 leave;
             }
-
-            //
-            //  setup the MDL for the non-paged pool we just allocated
-            //
-
+            
+            //  setup the MDL for the non-paged pool we just allocated            
             MmBuildMdlForNonPagedPool(newMdl);
         }
-
-        //
+        
         //  If the users original buffer had a MDL, get a system address.
-        //
-
         if (iopb->Parameters.Write.MdlAddress != NULL) {
-
-            //
+            
             //  This should be a simple MDL. We don't expect chained MDLs
             //  this high up the stack
-            //
-
             FLT_ASSERT(((PMDL)iopb->Parameters.Write.MdlAddress)->Next == NULL);
 
             origBuf = MmGetSystemAddressForMdlSafe(iopb->Parameters.Write.MdlAddress,
@@ -1518,12 +1373,9 @@ Return Value:
                     ("SwapBuffers!SwapPreWriteBuffers:            %wZ Failed to get system address for MDL: %p\n",
                         &volCtx->Name,
                         iopb->Parameters.Write.MdlAddress));
-
-                //
+                
                 //  If we could not get a system address for the users buffer,
                 //  then we are going to fail this operation.
-                //
-
                 Data->IoStatus.Status = STATUS_INSUFFICIENT_RESOURCES;
                 Data->IoStatus.Information = 0;
                 retValue = FLT_PREOP_COMPLETE;
@@ -1532,31 +1384,27 @@ Return Value:
 
         }
         else {
-
-            //
+            
             //  There was no MDL defined, use the given buffer address.
-            //
-
             origBuf = iopb->Parameters.Write.WriteBuffer;
         }
-
-        //
+        
         //  Copy the memory, we must do this inside the try/except because we
         //  may be using a users buffer address
-        //
-
         try {
 
             RtlCopyMemory(newBuf,
                 origBuf,
                 writeLen);
 
+            CryptXorBuffer(&gCryptStorage,
+                writeLen,
+                iopb->Parameters.Write.ByteOffset.QuadPart,
+                newBuf);
+
         } except(EXCEPTION_EXECUTE_HANDLER) {
-
-            //
+            
             //  The copy failed, return an error, failing the operation.
-            //
-
             Data->IoStatus.Status = GetExceptionCode();
             Data->IoStatus.Information = 0;
             retValue = FLT_PREOP_COMPLETE;
@@ -1569,12 +1417,10 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  We are ready to swap buffers, get a pre2Post context structure.
         //  We need it to pass the volume context and the allocate memory
         //  buffer to the post operation callback.
-
         p2pCtx = ExAllocateFromNPagedLookasideList(&Pre2PostContextList);
 
         if (p2pCtx == NULL) {
@@ -1585,11 +1431,8 @@ Return Value:
 
             leave;
         }
-
-        //
+        
         //  Set new buffers
-        //
-
         LOG_PRINT(LOGFL_WRITE,
             ("SwapBuffers!SwapPreWriteBuffers:            %wZ newB=%p newMdl=%p oldB=%p oldMdl=%p len=%d\n",
                 &volCtx->Name,
@@ -1602,19 +1445,14 @@ Return Value:
         iopb->Parameters.Write.WriteBuffer = newBuf;
         iopb->Parameters.Write.MdlAddress = newMdl;
         FltSetCallbackDataDirty(Data);
-
-        //
+        
         //  Pass state to our post-operation callback.        
-
         p2pCtx->SwappedBuffer = newBuf;
         p2pCtx->VolCtx = volCtx;
 
         *CompletionContext = p2pCtx;
-
-        //
+        
         //  Return we want a post-operation callback
-        //
-
         retValue = FLT_PREOP_SUCCESS_WITH_CALLBACK;
 
     }

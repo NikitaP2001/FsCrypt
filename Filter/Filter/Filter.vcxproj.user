@@ -4,7 +4,7 @@
     <SignMode>TestSign</SignMode>
     <TestCertificate>B:\src\FsCrypt\MyCert.cer</TestCertificate>
     <ProductionCertificate>B:\src\FsCrypt\MyCert.pfx</ProductionCertificate>
-    <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <DbgengKernelMachineName>VmM</DbgengKernelMachineName>
   </PropertyGroup>
 </Project>
